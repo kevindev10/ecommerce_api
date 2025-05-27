@@ -27,9 +27,6 @@ class User(Base):
 
 
 
-
-
-
 class Business(Base):
     __tablename__ = 'businesses'
 
