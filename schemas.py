@@ -8,7 +8,7 @@ class UserBase(BaseModel):
     email: EmailStr
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class UserCreate(UserBase):
@@ -22,7 +22,7 @@ class UserOut(BaseModel):
     join_date: datetime  # No default—handled at the database level
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         fields = {"is_verified": {"exclude": True}}  # Excluding is_verified
 
 
@@ -37,7 +37,7 @@ class ProductResponse(BaseModel):
     business_id: int  
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         fields = {
             "business_id": {"exclude": True},  
             "percentage_discount": {"exclude": True},  # Excluding percentage_discount
@@ -58,7 +58,7 @@ class BusinessResponse(BaseModel):
     owner_id: int  
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         fields = {"owner_id": {"exclude": True}}  # Excluding owner_id
 
 
@@ -71,7 +71,7 @@ class BusinessIn(BaseModel):
     owner_id: int  
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # -------------------- Product Schemas (Creation) --------------------
@@ -85,4 +85,4 @@ class ProductIn(BaseModel):
     business_id: int  
 
     class Config:
-        orm_mode = True
+        from_attributes = True
