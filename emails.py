@@ -6,6 +6,7 @@ from typing import List
 from config import settings
 import models
 import jwt
+from datetime import datetime, timedelta, timezone
 
 # Pydantic model for validating recipient email addresses
 class EmailSchema(BaseModel):
@@ -41,9 +42,11 @@ async def send_email(email: EmailSchema, instance: models.User):
         None
     """
     # Prepare token data for email verification
+    expire = datetime.now(timezone.utc) + timedelta(hours=48)  # Token valid for 48 hours
     token_data = {
         "id": instance.id,
         "email": instance.email,
+        "exp": int(expire.timestamp())  # <-- Use Unix timestamp!
     }
 
     # Generate a JWT token for email verification

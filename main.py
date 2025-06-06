@@ -81,18 +81,16 @@ async def user_registration(
 
 
 @app.get("/verification", response_class=HTMLResponse)
-async def email_verification(request: Request, token:str, db: Session = Depends(get_db)):
-    user = await authentication.verify_token(token)
-    
+async def email_verification(request: Request, token: str, db: Session = Depends(get_db)):
+    user = await authentication.verify_token(token, db)  # <-- pass db here!
     if user and not user.is_verified:
         user.is_verified = True
-        db.add(user)  # optional, but doesn't hurt
+        db.add(user)
         db.commit()
         db.refresh(user)
         return templates.TemplateResponse("verification.html", {"request": request, "username": user.username})
-    
     raise HTTPException(
-        status_code = status.HTTP_401_UNAUTHORIZED,
-        detail = "Invalid or expired token",
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or expired token",
         headers={"WWW-Authenticate": "Bearer"}
     )
