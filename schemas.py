@@ -20,10 +20,12 @@ class UserOut(BaseModel):
     username: str
     email: EmailStr
     join_date: datetime  # No default—handled at the database level
+    is_verified: bool = False  # Default to False
+    logo: Optional[str] = None  # Optional field for user logo
 
     class Config:
         from_attributes = True
-        fields = {"is_verified": {"exclude": True}}  # Excluding is_verified
+        # fields = {"is_verified": {"exclude": True}}  # Excluding is_verified
 
 
 # -------------------- Product Schemas --------------------

@@ -1,14 +1,16 @@
 from fastapi import FastAPI, Depends, Request, HTTPException, status, BackgroundTasks
 import os
-
+import jwt
 from fastapi.responses import HTMLResponse
 import models, schemas, authentication
 from database import engine, get_db
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy.event import listens_for
-from authentication import hash_password, verify_token
+from authentication import token_generator,authenticate_user, verify_token
+from fastapi.security import (OAuth2PasswordBearer, OAuth2PasswordRequestForm)
 from fastapi.templating import Jinja2Templates
+from config import settings
 import emails
 
 # Create all models in the database
@@ -27,6 +29,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# authorization configs
+oath2_scheme = OAuth2PasswordBearer(tokenUrl = 'token')
+
+
+
+async def get_current_user(token: str = Depends(oath2_scheme), db: Session = Depends(get_db)):
+    try:
+        # Decode the token using the secret key and algorithm
+        payload = jwt.decode(token, settings.secret, algorithms=["HS256"])
+        user_id = payload.get("id")
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+    except:
+        raise HTTPException(
+            status_code = status.HTTP_401_UNAUTHORIZED, 
+            detail = "Invalid username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return user
 
 
 @app.get("/")
@@ -94,3 +117,39 @@ async def email_verification(request: Request, token: str, db: Session = Depends
         detail="Invalid or expired token",
         headers={"WWW-Authenticate": "Bearer"}
     )
+
+
+ 
+@app.post('/token')
+async def generate_token(request_form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    token = await authentication.token_generator(request_form.username, request_form.password, db)
+    return {"access_token": token, "token_type": "bearer"}
+
+
+
+
+@app.post('/user/me')
+async def user_login(user: schemas.UserOut = Depends(get_current_user), db: Session = Depends(get_db)):
+  
+    business = db.query(models.Business).filter(models.Business.owner_id == user.id).first()
+
+    
+
+    # logo = business.logo
+    # logo = "localhost:8000/static/images/"+logo
+
+    return {"status" : "ok", 
+            "data" : 
+                {
+                    "username" : user.username,
+                    "email" : user.email,
+                    "verified" : user.is_verified,
+                    "join_date" : user.join_date.strftime("%b %d %Y"),
+                    # "logo" : logo
+                }
+            }
+
+
+
+
+

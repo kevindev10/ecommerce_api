@@ -9,15 +9,21 @@ from fastapi import Depends, HTTPException, status
 
 
 
-
 # Passlib context for hashing passwords
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+ 
 
 # Hash password
 def hash_password(password: str):
     return pwd_context.hash(password)
 
 
+# Verify password
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+# Verify token and get user
 async def verify_token(token: str, db: Session = Depends(get_db)):
     try:
         # Decode the token using the secret key and algorithm
@@ -48,6 +54,33 @@ async def verify_token(token: str, db: Session = Depends(get_db)):
     return user
 
 
-# # Verify password
-# def verify_password(plain_password, hashed_password):
-#     return pwd_context.verify(plain_password, hashed_password)
+# Authenticate user with username and password
+async def authenticate_user(username: str, password: str,  db: Session = Depends(get_db)):
+
+    user = db.query(models.User).filter(models.User.username == username).first()
+
+    if user  and verify_password(password, user.password):
+        return user
+
+    return False
+
+
+# Generate JWT token for the user
+async def token_generator(username: str, password: str, db: Session):
+    user = await authenticate_user(username, password, db)
+
+    if not user:
+        raise HTTPException(
+            status_code = status.HTTP_401_UNAUTHORIZED, 
+            detail = "Invalid username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token_data = {
+        "id" : user.id,
+        "username" : user.username
+    }
+
+    token = jwt.encode(token_data, settings.secret)
+    return token
+
