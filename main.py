@@ -16,6 +16,7 @@ from fastapi import File, UploadFile
 import secrets
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
+from fastapi.encoders import jsonable_encoder
 
 
 
@@ -143,11 +144,9 @@ async def generate_token(request_form: OAuth2PasswordRequestForm = Depends(), db
 async def user_login(user: schemas.UserOut = Depends(get_current_user), db: Session = Depends(get_db)):
   
     business = db.query(models.Business).filter(models.Business.owner_id == user.id).first()
-
     
-
-    # logo = business.logo
-    # logo = "localhost:8000/static/images/"+logo
+    logo = business.logo
+    logo = "localhost:8000/static/images/"+logo
 
     return {"status" : "ok", 
             "data" : 
@@ -156,7 +155,7 @@ async def user_login(user: schemas.UserOut = Depends(get_current_user), db: Sess
                     "email" : user.email,
                     "verified" : user.is_verified,
                     "join_date" : user.join_date.strftime("%b %d %Y"),
-                    # "logo" : logo
+                    "logo" : logo
                 }
             }
 
@@ -223,9 +222,8 @@ async def create_upload_file(id: int,
     
     FILEPATH = "./static/images/"
     filename = file.filename
-    extension = filename.spl
-        # await business.save()it(".")[1]
-
+    extension = filename.split(".")[1]
+        
     if extension not in ["jpg", "png"]:
         return {"status" : "error", "detail" : "file extension not allowed"}
 
@@ -262,3 +260,89 @@ async def create_upload_file(id: int,
     
     file_url = "localhost:8000" + generated_name[1:]
     return {"status": "ok", "filename": file_url}
+
+
+
+
+
+
+
+
+
+
+
+
+
+@app.post("/products")
+async def add_new_product(
+    product: schemas.ProductIn, 
+    user: schemas.UserOut = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Calculate percentage discount
+    product_data = product.dict()
+    if product_data['original_price'] > 0:
+        product_data["percentage_discount"] = (
+            (product_data["original_price"] - product_data['new_price']) / product_data['original_price']
+        ) * 100
+
+    # Link product to business
+    business = db.query(models.Business).filter(models.Business.owner_id == user.id).first()
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found for user")
+
+    new_product = models.Product(**product_data, business_id=business.id)
+    db.add(new_product)
+    db.commit()
+    db.refresh(new_product)
+    return {"status": "ok", "data": jsonable_encoder(new_product)}
+
+
+@app.get("/products")
+async def get_products(db: Session = Depends(get_db)):
+    products = db.query(models.Product).all()
+    return {"status": "ok", "data": [jsonable_encoder(product) for product in products]}
+
+
+@app.get("/products/{id}")
+async def specific_product(id: int, db: Session = Depends(get_db)):
+    product = db.query(models.Product).filter(models.Product.id == id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    business = db.query(models.Business).filter(models.Business.id == product.business_id).first()
+    owner = db.query(models.User).filter(models.User.id == business.owner_id).first()
+    return {
+        "status": "ok",
+        "data": {
+            "product_details": jsonable_encoder(product),
+            "business_details": {
+                "name": business.business_name,
+                "city": business.city,
+                "region": business.region,
+                "description": business.business_description,
+                "logo": business.logo,
+                "owner_id": owner.id,
+                "email": owner.email,
+                "join_date": owner.join_date.strftime("%b %d %Y")
+            }
+        }
+    }
+
+
+@app.delete("/products/{id}")
+async def delete_product(id: int, user: schemas.UserOut = Depends(get_current_user), db: Session = Depends(get_db)):
+    product = db.query(models.Product).filter(models.Product.id == id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    business = db.query(models.Business).filter(models.Business.id == product.business_id).first()
+    owner = db.query(models.User).filter(models.User.id == business.owner_id).first()
+    if user.id == owner.id:
+        db.delete(product)
+        db.commit()
+        return {"status": "ok"}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Not authenticated to perform this action",
+            headers={"WWW-Authenticate": "Bearer"},
+        )

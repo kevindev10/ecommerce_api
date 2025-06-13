@@ -83,8 +83,9 @@ class ProductIn(BaseModel):
     original_price: float
     new_price: Optional[float]
     offer_expiration_date: datetime
-    product_image: str
-    business_id: int  
+    
+    
 
     class Config:
         from_attributes = True
+      
