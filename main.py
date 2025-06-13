@@ -12,6 +12,15 @@ from fastapi.security import (OAuth2PasswordBearer, OAuth2PasswordRequestForm)
 from fastapi.templating import Jinja2Templates
 from config import settings
 import emails
+from fastapi import File, UploadFile
+import secrets
+from fastapi.staticfiles import StaticFiles
+from PIL import Image
+
+
+
+
+
 
 # Create all models in the database
 models.Base.metadata.create_all(bind=engine)
@@ -19,6 +28,8 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
 templates = Jinja2Templates(directory="templates")
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 origins = ["*"]
 
@@ -151,5 +162,61 @@ async def user_login(user: schemas.UserOut = Depends(get_current_user), db: Sess
 
 
 
+
+
+# image upload
+@app.post("/uploadfile/profile")
+async def create_upload_file(file: UploadFile = File(...),
+                              user: schemas.UserOut = Depends(get_current_user), 
+                              db: Session = Depends(get_db)):
+    
+    FILEPATH = "./static/images/"
+    filename = file.filename
+    extension = filename.split(".")[1]
+
+    if extension not in ["jpg", "png"]:
+        return {"status" : "error", "detail" : "file extension not allowed"}
+
+    token_name = secrets.token_hex(10)+"."+extension
+    generated_name = FILEPATH + token_name
+    file_content = await file.read()
+    with open(generated_name, "wb") as file:
+        file.write(file_content)
+
+
+    # pillow
+    img = Image.open(generated_name)
+    img = img.resize(size = (200,200))
+    img.save(generated_name)
+
+    file.close()
+
+    
+    business = db.query(models.Business).filter(models.Business.owner_id == user.id).first()
+
+   
+    owner = db.query(models.User).filter(models.User.id == user.id).first()
+
+ 
+    
+    if owner is not None:
+        business.logo = token_name
+
+        # await business.save()
+        db.add(business)      # Optional, but safe if business was queried in this session
+        db.commit()           # Commit the change to the database
+        db.refresh(business)  # Refresh the instance with new data from DB
+
+
+        
+    
+    else:
+        raise HTTPException(
+            status_code = status.HTTP_401_UNAUTHORIZED, 
+            detail = "Not authenticated to perform this action",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    file_url = "localhost:8000" + generated_name[1:]
+    return {"status": "ok", "filename": file_url}
 
 
