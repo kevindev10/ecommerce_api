@@ -1,4 +1,4 @@
-from sqlalchemy import TIMESTAMP, Column, ForeignKey, Integer, String, Boolean, DateTime, Text, Numeric
+from sqlalchemy import TIMESTAMP, Column, ForeignKey, Integer, String, Boolean, DateTime, Text, Numeric, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime, timezone, timedelta
@@ -62,7 +62,7 @@ class Product(Base):
     original_price = Column(Numeric(12, 2))
     new_price = Column(Numeric(12, 2))
     percentage_discount = Column(Integer)
-    offer_expiration_date = Column(DateTime, nullable=False, server_default=text("(CURRENT_TIMESTAMP + interval '30 days')"))
+    offer_expiration_date = Column(Date, nullable=True)
     product_image = Column(String(255), nullable=False, default="productDefault.jpg")  # Path or URL to the product image
     date_published = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
     business_id = Column(Integer, ForeignKey('businesses.id', ondelete="CASCADE"), nullable=False, index=True)

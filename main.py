@@ -264,15 +264,6 @@ async def create_upload_file(id: int,
 
 
 
-
-
-
-
-
-
-
-
-
 @app.post("/products")
 async def add_new_product(
     product: schemas.ProductIn, 
@@ -346,3 +337,74 @@ async def delete_product(id: int, user: schemas.UserOut = Depends(get_current_us
             detail="Not authenticated to perform this action",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+
+
+@app.put("/products/{id}")
+async def update_product(
+    id: int,
+    product: schemas.ProductIn,
+    user: schemas.UserOut = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    db_product = db.query(models.Product).filter(models.Product.id == id).first()
+    if not db_product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    business = db.query(models.Business).filter(models.Business.id == db_product.business_id).first()
+    if business.owner_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authorized to update this product"
+        )
+    
+    update_data = product.dict(exclude_unset=True)
+    
+    # Recalculate percentage_discount if prices are being updated
+    if "original_price" in update_data or "new_price" in update_data:
+        original_price = update_data.get("original_price", db_product.original_price)
+        new_price = update_data.get("new_price", db_product.new_price)
+        if original_price > 0:
+            update_data["percentage_discount"] = (
+                (original_price - new_price) / original_price
+            ) * 100
+        else:
+            update_data["percentage_discount"] = 0
+
+    for key, value in update_data.items():
+        setattr(db_product, key, value)
+    
+    db.add(db_product)
+    db.commit()
+    db.refresh(db_product)
+    return {"status": "ok", "data": db_product}
+
+
+
+
+
+@app.put("/business/{id}")
+async def update_business(
+    id: int,
+    business: schemas.BusinessIn,
+    user: schemas.UserOut = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    db_business = db.query(models.Business).filter(models.Business.id == id).first()
+    if not db_business:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    if db_business.owner_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authorized to update this business"
+        )
+
+    for key, value in business.dict(exclude_unset=True).items():
+        setattr(db_business, key, value)
+
+    db.add(db_business)
+    db.commit()
+    db.refresh(db_business)
+    return {"status": "ok", "data": db_business}

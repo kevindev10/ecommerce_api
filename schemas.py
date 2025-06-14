@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from datetime import datetime
+from datetime import datetime, date
 from typing import List, Optional
 
 # -------------------- User Schemas --------------------
@@ -82,10 +82,9 @@ class ProductIn(BaseModel):
     category: str
     original_price: float
     new_price: Optional[float]
-    offer_expiration_date: datetime
+    offer_expiration_date: Optional[date] = None
     
     
 
     class Config:
         from_attributes = True
-      
