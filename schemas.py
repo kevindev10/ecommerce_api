@@ -69,8 +69,7 @@ class BusinessIn(BaseModel):
     city: str
     region: str
     business_description: Optional[str]
-    logo: str
-    owner_id: int  
+     
 
     class Config:
         from_attributes = True
